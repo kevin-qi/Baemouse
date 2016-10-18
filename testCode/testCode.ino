@@ -18,14 +18,13 @@ void setup() {
   pinMode(leftEncoderPinB, INPUT); 
   pinMode(rightEncoderPinA, INPUT);
   pinMode(rightEncoderPinB, INPUT);
-  attachInterrupt(leftEncoderPin, onLeftTick, CHANGE);
-  attachInterrupt(rightEncoderPin, onRightTick, CHANGE);
-  
-  
+  attachInterrupt(leftEncoderPinA, onLeftTick, CHANGE);
+  attachInterrupt(rightEncoderPinA, onRightTick, CHANGE);
+  attachInterrupt(leftEncoderPinB, onLeftTick, CHANGE);
+  attachInterrupt(rightEncoderPinB, onRightTick, CHANGE);  
 }
 
-void loop() { 
-
+void loop() {
   int prev_error = 0;
   int error = leftTicks - rightTicks;    
   int delta_error = error - prev_error;
@@ -33,8 +32,14 @@ void loop() {
   float D = -100;
   float pidOutput = P * error + D * delta_error;
   prev_error = error;
-  driveLeft(0.75 + 0.25 * pidOutput);
-  driveRight(0.75 - 0.25 * pidOutput);
+  if (analogRead(rightSensor) < 10 && analogRead(frontSensor) < 10) {
+    turnLeft(0.75 + 0.25 * pidOutput);
+  } else if (analogRead(frontSensor) < 10) {
+    turnRight(0.75 + 0.25 * pidOutput);
+  } else {
+    driveLeft(0.75 + 0.25 * pidOutput);
+    driveRight(0.75 - 0.25 * pidOutput);
+  }
 }
 
 void onLeftTick() { 
@@ -43,6 +48,16 @@ void onLeftTick() {
 
 void onRightTick() { 
   rightTicks++;
+}
+
+void turnLeft(float spd) {
+  analogWrite(leftMotorPinB, spd * 255);
+  analogWrite(rightMotorPinA, spd * 255);
+}
+
+void turnRight(float spd) {
+  analogWrite(rightMotorPinB, spd * 255);
+  analogWrite(leftMotorPinA, spd * 255);
 }
 
 void driveLeft(float spd) { 
