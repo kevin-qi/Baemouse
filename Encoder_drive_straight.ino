@@ -21,61 +21,130 @@ int rightMotorPin2=10;
 volatile int leftTicks=0;
 volatile int rightTicks=0;
 
-void setup() {
-  //Begin Serial Port
-  Serial.begin(9600);
+//Speed variables (Units: pulses/microsecond)
+volatile int leftSpeed=0; 
+volatile int rightSpeed=0;
 
+volatile long timer_sampling_interval = 50; //sampling time in microseconds
+
+volatile long timer = 0;
+volatile long current_time = 0;
+
+int targetSpeed=50;
+
+float pidOutput=0;
+
+void setup() {
+  delay(3000);
+  Serial.begin(9600);
   //Initialize pins
   pinMode(leftInterrupt, INPUT);
   pinMode(leftEncoderPin, INPUT);
+  
+  pinMode(leftMotorPin1, OUTPUT);
+  pinMode(rightMotorPin1, OUTPUT);
+  pinMode(leftMotorPin2, OUTPUT);
+  pinMode(rightMotorPin2, OUTPUT);
+  
   pinMode(rightInterrupt, INPUT);
   pinMode(rightEncoderPin, INPUT);
-
+  
   //Attach Interrupts
   attachInterrupt(leftInterrupt, onLeftInterrupt, RISING);
   attachInterrupt(rightInterrupt, onRightInterrupt, FALLING); //Falling the wheels are mirrored on the vehicle
+
+  //Start Timer
+  timer = millis();
 }
 
 void onLeftInterrupt() {
   //We know that pin1 just switched to LOW
   if(digitalRead(leftEncoderPin)==0){ //Check if pin2 is at low as well
-    leftTicks++; //If so, then it is moving forward
+    leftTicks--; //If so, then it is moving forward
   }
   else{
-    leftTicks--; //Otherwise, it is moving backwards
+    leftTicks++; //Otherwise, it is moving backwards
   }
 }
 
 void onRightInterrupt() {
   //We know that pin1 just switched to LOW
   if(digitalRead(rightEncoderPin)==0){ //Check if pin2 is at low as well
-    rightTicks++; //If so, then it is moving forward
+    rightTicks--; //If so, then it is moving forward
   }
   else{
-    rightTicks--; //Otherwise, it is moving backwards
+    rightTicks++; //Otherwise, it is moving backwards
   }
 }
 
 void driveLeft(float spd){
-  analogWrite(leftMotorPin1, spd*255);
+  int value = spd * 200;
+  if (value > 255)
+    value = 255;
+  if (value < 0)
+    value = 0;
+  analogWrite(leftMotorPin2, value);
 }
 
 void driveRight(float spd){
-  analogWrite(rightMotorPin1, spd*255);
+  int value = spd * 200;
+  if (value > 255)
+    value = 255;
+  if (value < 0)
+    value = 0;
+  analogWrite(rightMotorPin2, value);
 }
 
-int prev_error = 0;
-int prev=0;
-void loop() {
-  // put your main code here, to run repeatedly:
-  Serial.println(prev);
-  prev = rightTicks-leftTicks;
-  int error = leftTicks - rightTicks;
+/*
+float prev_left_error = 0;
+float prev_right_error = 0;
+float left_error = 0;
+float right_error = 0;
+float delta_time = 0;
+*/
+float error = 0 ;
+float prev_error = 0;
+float P = -10;
+float D = -100;
+float scale = 500;
+
+float pidControl(float P,float D,float error,float prev_error){
   int delta_error = error - prev_error;
-  float P = -2;
-  float D = -100;
-  float pidOutput = P * error + D * error;
-  prev_error = error;
-  driveLeft(0.75 + 0.25*pidOutput);
-  driveRight(0.75 - 0.25 * pidOutput);
+  return P * error + D * delta_error;
+}
+
+void loop() {
+    error = leftTicks-rightTicks;
+    Serial.println(pidOutput);
+    pidOutput=pidControl(P,D,error,prev_error)/scale;
+    driveLeft(0.25+pidOutput);
+    driveRight(0.25-pidOutput);
+    prev_error = error;
+    
+    /*
+    current_time=micros();
+    delta_time = current_time-timer;
+    if(delta_time>timer_sampling_interval){
+      leftSpeed = leftTicks/delta_time;
+      rightSpeed = rightTicks/delta_time;
+      leftTicks=0;
+      rightTicks=0;
+      timer = current_time;
+    }
+    
+    left_error = leftSpeed - targetSpeed;
+    right_error = rightSpeed - targetSpeed; 
+    
+    float leftPID = 0;
+    float rightPID = 0;
+    float P = -0.2;
+    float D = -0.9;
+    
+    leftPID = pidControl(P,D,left_error,prev_left_error);
+    rightPID = pidControl(P,D,right_error,prev_right_error);
+    prev_left_error = left_error;
+    prev_right_error = right_error;
+    
+    driveLeft(0.25 + leftPID);
+    driveRight(0.25 + rightPID); */
 }
